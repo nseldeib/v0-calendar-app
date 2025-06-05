@@ -11,6 +11,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { format } from "date-fns"
 import type { Database } from "@/lib/supabase/types"
 
+// Add this import at the top
+const TIMEZONES = [
+  { value: "UTC", label: "UTC" },
+  { value: "America/New_York", label: "Eastern Time" },
+  { value: "America/Chicago", label: "Central Time" },
+  { value: "America/Denver", label: "Mountain Time" },
+  { value: "America/Los_Angeles", label: "Pacific Time" },
+  { value: "Europe/London", label: "London" },
+  { value: "Europe/Paris", label: "Paris" },
+  { value: "Asia/Tokyo", label: "Tokyo" },
+  { value: "Asia/Shanghai", label: "Shanghai" },
+  { value: "Australia/Sydney", label: "Sydney" },
+]
+
 type Event = Database["public"]["Tables"]["events"]["Row"]
 type EventInsert = Database["public"]["Tables"]["events"]["Insert"]
 
@@ -41,6 +55,7 @@ export function EventDialog({ open, onOpenChange, event, selectedDate, onSave, o
     location: "",
     color: "#3b82f6",
     is_all_day: false,
+    timezone: "UTC",
   })
   const [loading, setLoading] = useState(false)
 
@@ -58,6 +73,7 @@ export function EventDialog({ open, onOpenChange, event, selectedDate, onSave, o
         location: event.location || "",
         color: event.color,
         is_all_day: event.is_all_day,
+        timezone: event.timezone || "UTC",
       })
     } else if (selectedDate) {
       // Create mode
@@ -74,6 +90,7 @@ export function EventDialog({ open, onOpenChange, event, selectedDate, onSave, o
         location: "",
         color: "#3b82f6",
         is_all_day: false,
+        timezone: "UTC",
       })
     }
   }, [event, selectedDate, open])
@@ -91,6 +108,7 @@ export function EventDialog({ open, onOpenChange, event, selectedDate, onSave, o
         location: formData.location.trim() || null,
         color: formData.color,
         is_all_day: formData.is_all_day,
+        timezone: formData.timezone,
         user_id: "", // This will be set in the parent component
       }
 
@@ -186,6 +204,22 @@ export function EventDialog({ open, onOpenChange, event, selectedDate, onSave, o
               onChange={(e) => setFormData({ ...formData, location: e.target.value })}
               placeholder="Event location (optional)"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Timezone</Label>
+            <Select value={formData.timezone} onValueChange={(value) => setFormData({ ...formData, timezone: value })}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TIMEZONES.map((tz) => (
+                  <SelectItem key={tz.value} value={tz.value}>
+                    {tz.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
