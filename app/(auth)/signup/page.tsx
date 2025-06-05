@@ -32,6 +32,8 @@ export default function SignupPage() {
       // Get the current origin
       const origin = typeof window !== "undefined" ? window.location.origin : ""
 
+      console.log("Signing up with redirect to:", `${origin}/auth/callback`)
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -44,16 +46,18 @@ export default function SignupPage() {
       })
 
       if (error) {
+        console.error("Signup error:", error)
         setError(error.message)
       } else if (data.user && !data.session) {
         setMessage("Check your email for the confirmation link!")
-        // Don't auto-redirect, let user check email
+        console.log("Signup successful, confirmation email sent to:", email)
       } else if (data.session) {
         // User is automatically signed in (email confirmation disabled)
+        console.log("Signup successful, user automatically signed in")
         router.push("/calendar")
       }
     } catch (error) {
-      console.error("Signup error:", error)
+      console.error("Signup exception:", error)
       setError("An unexpected error occurred")
     } finally {
       setLoading(false)

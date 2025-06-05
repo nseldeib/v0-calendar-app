@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { supabase } from "@/lib/supabase/client"
 import { Calendar, Loader2 } from "lucide-react"
+import { useAuth } from "@/lib/auth/auth-context"
 
 function LoginForm() {
   const [email, setEmail] = useState("")
@@ -19,6 +20,15 @@ function LoginForm() {
   const [error, setError] = useState("")
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { user, loading: authLoading } = useAuth()
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!authLoading && user) {
+      console.log("User already authenticated, redirecting to calendar")
+      router.push("/calendar")
+    }
+  }, [user, authLoading, router])
 
   useEffect(() => {
     // Check for error from auth callback or URL params
@@ -38,16 +48,18 @@ function LoginForm() {
     setError("")
 
     try {
+      console.log("Attempting login for:", email)
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
+        console.error("Login error:", error)
         setError(error.message)
       } else if (data.user) {
         console.log("Login successful for user:", data.user.id)
-        router.push("/calendar")
+        // Don't manually redirect here, let the auth context handle it
       }
     } catch (error) {
       console.error("Login exception:", error)
@@ -55,6 +67,11 @@ function LoginForm() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Don't render if already authenticated
+  if (!authLoading && user) {
+    return null
   }
 
   return (

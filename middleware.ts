@@ -54,39 +54,65 @@ export async function middleware(request: NextRequest) {
     },
   )
 
-  // Refresh session if expired
-  await supabase.auth.getUser()
+  const pathname = request.nextUrl.pathname
 
-  // Protect dashboard routes
+  // Skip middleware for static files and API routes
   if (
-    request.nextUrl.pathname.startsWith("/calendar") ||
-    request.nextUrl.pathname.startsWith("/todos") ||
-    request.nextUrl.pathname.startsWith("/meetings") ||
-    request.nextUrl.pathname.startsWith("/settings")
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/auth/") ||
+    pathname.includes(".")
   ) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    return response
+  }
 
-    if (!user) {
+  try {
+    // Get the session
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    console.log("Middleware check:", {
+      pathname,
+      hasSession: !!session,
+      userId: session?.user?.id,
+    })
+
+    // Protected routes
+    const protectedRoutes = ["/calendar", "/todos", "/meetings", "/settings"]
+    const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
+
+    // Auth routes
+    const authRoutes = ["/login", "/signup"]
+    const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))
+
+    if (isProtectedRoute && !session) {
+      console.log("Redirecting to login - no session")
       return NextResponse.redirect(new URL("/login", request.url))
     }
-  }
 
-  // Redirect authenticated users away from auth pages
-  if (request.nextUrl.pathname.startsWith("/login") || request.nextUrl.pathname.startsWith("/signup")) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (user) {
+    if (isAuthRoute && session) {
+      console.log("Redirecting to calendar - already authenticated")
       return NextResponse.redirect(new URL("/calendar", request.url))
     }
-  }
 
-  return response
+    return response
+  } catch (error) {
+    console.error("Middleware error:", error)
+    // On error, allow the request to continue
+    return response
+  }
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public files (public folder)
+     */
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 }

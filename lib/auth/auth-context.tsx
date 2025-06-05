@@ -30,10 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log("Fetching profile for user:", userId)
 
-      // First, check if profile exists
-      const { data, error, count } = await supabase.from("profiles").select("*", { count: "exact" }).eq("id", userId)
-
-      console.log("Profile query result:", { data, error, count })
+      const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle()
 
       if (error) {
         console.error("Error fetching profile:", error)
@@ -41,18 +38,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // If no profile exists, create one
-      if (!data || data.length === 0) {
+      if (!data) {
         console.log("No profile found, creating one...")
         return await createProfile(userId)
       }
 
-      // If multiple profiles exist (shouldn't happen), use the first one
-      if (data.length > 1) {
-        console.warn("Multiple profiles found for user, using first one")
-        return data[0]
-      }
-
-      return data[0]
+      console.log("Profile found:", data)
+      return data
     } catch (error) {
       console.error("Exception in fetchProfile:", error)
       return null
@@ -108,14 +100,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
+    let mounted = true
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log("Initial session:", session?.user?.id)
+      if (!mounted) return
+
+      console.log("Initial session check:", !!session, session?.user?.email)
       setSession(session)
       setUser(session?.user ?? null)
 
       if (session?.user) {
-        fetchProfile(session.user.id).then(setProfile)
+        fetchProfile(session.user.id).then((profile) => {
+          if (mounted) setProfile(profile)
+        })
       }
 
       setLoading(false)
@@ -125,21 +123,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state change:", event, session?.user?.id)
+      if (!mounted) return
+
+      console.log("Auth state change:", event, !!session, session?.user?.email)
       setSession(session)
       setUser(session?.user ?? null)
 
       if (session?.user) {
         const profileData = await fetchProfile(session.user.id)
-        setProfile(profileData)
+        if (mounted) setProfile(profileData)
       } else {
-        setProfile(null)
+        if (mounted) setProfile(null)
       }
 
-      setLoading(false)
+      if (mounted) setLoading(false)
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   return (

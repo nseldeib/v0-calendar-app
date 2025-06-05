@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { addMonths, subMonths } from "date-fns"
 import type { Database } from "@/lib/supabase/types"
+import { useRouter } from "next/navigation"
 
 type Event = Database["public"]["Tables"]["events"]["Row"]
 type EventInsert = Database["public"]["Tables"]["events"]["Insert"]
@@ -21,21 +22,47 @@ export default function CalendarPage() {
   const [eventDialogOpen, setEventDialogOpen] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  const { user } = useAuth()
+  const { user, session, loading: authLoading } = useAuth()
   const { toast } = useToast()
+  const router = useRouter()
+
+  // Check authentication
+  useEffect(() => {
+    console.log("Calendar page - Auth state:", {
+      authLoading,
+      hasUser: !!user,
+      hasSession: !!session,
+      userId: user?.id,
+    })
+
+    if (!authLoading && !user) {
+      console.log("No user found, redirecting to login")
+      router.push("/login")
+      return
+    }
+  }, [user, session, authLoading, router])
 
   // Fetch events
   const fetchEvents = async () => {
-    if (!user) return
+    if (!user) {
+      console.log("No user, skipping event fetch")
+      return
+    }
 
     try {
+      console.log("Fetching events for user:", user.id)
       const { data, error } = await supabase
         .from("events")
         .select("*")
         .eq("user_id", user.id)
         .order("start_time", { ascending: true })
 
-      if (error) throw error
+      if (error) {
+        console.error("Error fetching events:", error)
+        throw error
+      }
+
+      console.log("Events fetched:", data?.length || 0)
       setEvents(data || [])
     } catch (error) {
       console.error("Error fetching events:", error)
@@ -50,8 +77,10 @@ export default function CalendarPage() {
   }
 
   useEffect(() => {
-    fetchEvents()
-  }, [user])
+    if (user && !authLoading) {
+      fetchEvents()
+    }
+  }, [user, authLoading])
 
   // Navigation handlers
   const handlePreviousMonth = () => {
@@ -142,6 +171,19 @@ export default function CalendarPage() {
     }
   }
 
+  // Show loading while auth is loading
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show loading while events are loading
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -151,6 +193,11 @@ export default function CalendarPage() {
         </div>
       </div>
     )
+  }
+
+  // Don't render if no user (will redirect)
+  if (!user) {
+    return null
   }
 
   return (
