@@ -33,12 +33,17 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname()
-  const { signOut, profile } = useAuth()
+  const { signOut, profile, user } = useAuth()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const handleSignOut = async () => {
     await signOut()
   }
+
+  // Use profile data if available, otherwise fall back to user data
+  const displayName = profile?.full_name || user?.user_metadata?.full_name || "User"
+  const displayEmail = profile?.email || user?.email || ""
+  const displayInitial = displayName.charAt(0) || displayEmail.charAt(0) || "U"
 
   return (
     <>
@@ -95,13 +100,11 @@ export function Sidebar() {
           <div className="p-4 border-t">
             <div className="flex items-center gap-3 mb-3">
               <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-                <span className="text-sm font-medium text-primary-foreground">
-                  {profile?.full_name?.charAt(0) || profile?.email?.charAt(0) || "U"}
-                </span>
+                <span className="text-sm font-medium text-primary-foreground">{displayInitial}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{profile?.full_name || "User"}</p>
-                <p className="text-xs text-muted-foreground truncate">{profile?.email}</p>
+                <p className="text-sm font-medium truncate">{displayName}</p>
+                <p className="text-xs text-muted-foreground truncate">{displayEmail}</p>
               </div>
             </div>
             <Button variant="outline" size="sm" className="w-full" onClick={handleSignOut}>

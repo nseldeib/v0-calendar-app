@@ -28,9 +28,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = async (userId: string) => {
     try {
+      // Check if profiles table exists by attempting to query it
       const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single()
 
       if (error) {
+        // If table doesn't exist, create a basic profile object from user data
+        if (error.code === "42P01" || error.message.includes("does not exist")) {
+          console.warn("Profiles table does not exist. Using basic user data.")
+          return null
+        }
         console.error("Error fetching profile:", error)
         return null
       }

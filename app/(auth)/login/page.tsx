@@ -1,9 +1,8 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { Suspense, useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,12 +12,21 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { supabase } from "@/lib/supabase/client"
 import { Calendar, Loader2 } from "lucide-react"
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    // Check for error from auth callback
+    const authError = searchParams.get("error")
+    if (authError === "auth_callback_error") {
+      setError("There was an error confirming your account. Please try logging in.")
+    }
+  }, [searchParams])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -100,5 +108,19 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   )
 }

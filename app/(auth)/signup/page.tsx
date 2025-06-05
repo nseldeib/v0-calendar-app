@@ -29,26 +29,31 @@ export default function SignupPage() {
     setMessage("")
 
     try {
-      const { error } = await supabase.auth.signUp({
+      // Get the current origin
+      const origin = typeof window !== "undefined" ? window.location.origin : ""
+
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName,
           },
+          emailRedirectTo: `${origin}/auth/callback`,
         },
       })
 
       if (error) {
         setError(error.message)
-      } else {
+      } else if (data.user && !data.session) {
         setMessage("Check your email for the confirmation link!")
-        // Optionally redirect after a delay
-        setTimeout(() => {
-          router.push("/login")
-        }, 3000)
+        // Don't auto-redirect, let user check email
+      } else if (data.session) {
+        // User is automatically signed in (email confirmation disabled)
+        router.push("/calendar")
       }
     } catch (error) {
+      console.error("Signup error:", error)
       setError("An unexpected error occurred")
     } finally {
       setLoading(false)
