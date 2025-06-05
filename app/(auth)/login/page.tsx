@@ -21,10 +21,14 @@ function LoginForm() {
   const searchParams = useSearchParams()
 
   useEffect(() => {
-    // Check for error from auth callback
+    // Check for error from auth callback or URL params
     const authError = searchParams.get("error")
-    if (authError === "auth_callback_error") {
-      setError("There was an error confirming your account. Please try logging in.")
+    if (authError) {
+      if (authError === "auth_callback_error") {
+        setError("There was an error confirming your account. Please try logging in.")
+      } else {
+        setError(decodeURIComponent(authError))
+      }
     }
   }, [searchParams])
 
@@ -34,17 +38,19 @@ function LoginForm() {
     setError("")
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
         setError(error.message)
-      } else {
+      } else if (data.user) {
+        console.log("Login successful for user:", data.user.id)
         router.push("/calendar")
       }
     } catch (error) {
+      console.error("Login exception:", error)
       setError("An unexpected error occurred")
     } finally {
       setLoading(false)
