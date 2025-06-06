@@ -126,6 +126,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!mounted) return
 
       console.log("Auth state change:", event, !!session, session?.user?.email)
+
+      // Handle immediate sign in after signup or login
+      if (event === "SIGNED_IN" && session?.user) {
+        console.log("User signed in, redirecting to calendar")
+        window.location.href = "/calendar"
+      }
+
       setSession(session)
       setUser(session?.user ?? null)
 

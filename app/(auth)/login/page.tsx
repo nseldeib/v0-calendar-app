@@ -30,18 +30,6 @@ function LoginForm() {
     }
   }, [user, authLoading, router])
 
-  useEffect(() => {
-    // Check for error from auth callback or URL params
-    const authError = searchParams.get("error")
-    if (authError) {
-      if (authError === "auth_callback_error") {
-        setError("There was an error confirming your account. Please try logging in.")
-      } else {
-        setError(decodeURIComponent(authError))
-      }
-    }
-  }, [searchParams])
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -57,9 +45,9 @@ function LoginForm() {
       if (error) {
         console.error("Login error:", error)
         setError(error.message)
-      } else if (data.user) {
+      } else if (data.user && data.session) {
         console.log("Login successful for user:", data.user.id)
-        // Don't manually redirect here, let the auth context handle it
+        router.push("/calendar")
       }
     } catch (error) {
       console.error("Login exception:", error)

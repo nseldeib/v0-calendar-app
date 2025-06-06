@@ -29,10 +29,7 @@ export default function SignupPage() {
     setMessage("")
 
     try {
-      // Get the current origin
-      const origin = typeof window !== "undefined" ? window.location.origin : ""
-
-      console.log("Signing up with redirect to:", `${origin}/auth/callback`)
+      console.log("Signing up user:", email)
 
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -41,20 +38,23 @@ export default function SignupPage() {
           data: {
             full_name: fullName,
           },
-          emailRedirectTo: `${origin}/auth/callback`,
+          // Remove emailRedirectTo to disable email confirmation
         },
       })
 
       if (error) {
         console.error("Signup error:", error)
         setError(error.message)
-      } else if (data.user && !data.session) {
-        setMessage("Check your email for the confirmation link!")
-        console.log("Signup successful, confirmation email sent to:", email)
-      } else if (data.session) {
-        // User is automatically signed in (email confirmation disabled)
-        console.log("Signup successful, user automatically signed in")
-        router.push("/calendar")
+      } else if (data.user) {
+        if (data.session) {
+          // User is automatically signed in
+          console.log("Signup successful, user automatically signed in")
+          router.push("/calendar")
+        } else {
+          // This shouldn't happen with email confirmation disabled, but handle it
+          console.log("Signup successful, but no session created")
+          setMessage("Account created successfully! Please try logging in.")
+        }
       }
     } catch (error) {
       console.error("Signup exception:", error)
