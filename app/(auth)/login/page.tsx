@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { Suspense, useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,7 +19,6 @@ function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { user, session, loading: authLoading } = useAuth()
 
   // Debug logging
@@ -32,7 +31,7 @@ function LoginForm() {
     })
   }, [authLoading, user, session])
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated - but only after auth loading is complete
   useEffect(() => {
     if (!authLoading && user && session) {
       console.log("User already authenticated, redirecting to calendar")
@@ -42,6 +41,8 @@ function LoginForm() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (loading) return // Prevent double submission
+
     setLoading(true)
     setError("")
 
@@ -55,32 +56,25 @@ function LoginForm() {
       if (error) {
         console.error("Login error:", error)
         setError(error.message)
-        setLoading(false)
         return
       }
 
       if (data.user && data.session) {
         console.log("Login successful for user:", data.user.id)
-        console.log("Session created:", !!data.session)
-
-        // Wait a moment for auth context to update
-        setTimeout(() => {
-          console.log("Redirecting to calendar after login")
-          router.replace("/calendar")
-        }, 100)
+        // The auth context will handle the redirect
       } else {
         console.error("Login succeeded but no user/session returned")
         setError("Login failed - no session created")
-        setLoading(false)
       }
     } catch (error) {
       console.error("Login exception:", error)
       setError("An unexpected error occurred")
+    } finally {
       setLoading(false)
     }
   }
 
-  // Show loading while auth is loading
+  // Show a simple loading state while auth is initializing
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -104,6 +98,7 @@ function LoginForm() {
     )
   }
 
+  // Render the login form
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">

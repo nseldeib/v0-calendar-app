@@ -34,6 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error("Error fetching profile:", error)
+        // Don't throw error, just return null to continue
         return null
       }
 
@@ -101,6 +102,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let mounted = true
+    let timeoutId: NodeJS.Timeout
+
+    // Set a timeout to ensure loading doesn't get stuck
+    timeoutId = setTimeout(() => {
+      if (mounted) {
+        console.log("Auth initialization timeout - setting loading to false")
+        setLoading(false)
+      }
+    }, 5000) // 5 second timeout
 
     // Get initial session
     const initializeAuth = async () => {
@@ -127,19 +137,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           if (session?.user) {
             console.log("User found in session, fetching profile...")
-            const profile = await fetchProfile(session.user.id)
-            if (mounted) {
-              setProfile(profile)
+            try {
+              const profile = await fetchProfile(session.user.id)
+              if (mounted) {
+                setProfile(profile)
+              }
+            } catch (profileError) {
+              console.error("Error fetching profile:", profileError)
+              // Continue even if profile fetch fails
             }
           }
 
           console.log("Auth initialization complete, setting loading to false")
           setLoading(false)
+          clearTimeout(timeoutId)
         }
       } catch (error) {
         console.error("Error initializing auth:", error)
         if (mounted) {
           setLoading(false)
+          clearTimeout(timeoutId)
         }
       }
     }
@@ -154,15 +171,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log("Auth state change:", event, !!session, session?.user?.email)
 
+      // Clear any existing timeout
+      clearTimeout(timeoutId)
+
       // Update state immediately
       setSession(session)
       setUser(session?.user ?? null)
 
       if (session?.user) {
         console.log("User signed in, fetching profile...")
-        const profileData = await fetchProfile(session.user.id)
-        if (mounted) {
-          setProfile(profileData)
+        try {
+          const profileData = await fetchProfile(session.user.id)
+          if (mounted) {
+            setProfile(profileData)
+          }
+        } catch (profileError) {
+          console.error("Error fetching profile:", profileError)
+          // Continue even if profile fetch fails
         }
       } else {
         console.log("User signed out, clearing profile")
@@ -180,6 +205,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       mounted = false
+      clearTimeout(timeoutId)
       subscription.unsubscribe()
     }
   }, [])
