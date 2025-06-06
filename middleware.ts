@@ -20,6 +20,14 @@ export async function middleware(request: NextRequest) {
     return response
   }
 
+  // Skip auth check for auth pages and root to prevent redirect loops
+  const publicRoutes = ["/login", "/signup", "/"]
+  const isPublicRoute = publicRoutes.some((route) => pathname === route || pathname.startsWith(route))
+
+  if (isPublicRoute) {
+    return response
+  }
+
   try {
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -67,14 +75,6 @@ export async function middleware(request: NextRequest) {
       },
     )
 
-    // Skip auth check for auth pages to prevent redirect loops
-    const authRoutes = ["/login", "/signup"]
-    const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))
-
-    if (isAuthRoute) {
-      return response
-    }
-
     const {
       data: { session },
     } = await supabase.auth.getSession()
@@ -84,6 +84,7 @@ export async function middleware(request: NextRequest) {
     const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
 
     if (isProtectedRoute && !session) {
+      console.log("Redirecting to login from middleware:", pathname)
       return NextResponse.redirect(new URL("/login", request.url))
     }
 

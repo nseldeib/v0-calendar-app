@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(false) // Start with false to avoid blocking
+  const [loading, setLoading] = useState(false)
   const [initialized, setInitialized] = useState(false)
 
   // Simple profile fetch that won't block rendering
@@ -56,9 +56,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
+      setLoading(true)
       await supabase.auth.signOut()
+      // Clear state immediately
+      setUser(null)
+      setProfile(null)
+      setSession(null)
     } catch (error) {
       console.error("Error signing out:", error)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -70,6 +77,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         // Get initial session
         const { data } = await supabase.auth.getSession()
+
+        console.log("Auth context initializing with session:", !!data.session)
 
         setSession(data.session)
         setUser(data.session?.user ?? null)
@@ -91,6 +100,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("Auth state change:", event, !!session)
+
       setSession(session)
       setUser(session?.user ?? null)
 

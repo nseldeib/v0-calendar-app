@@ -11,22 +11,40 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { supabase } from "@/lib/supabase/client"
 import { Calendar, Loader2 } from "lucide-react"
-import { useAuth } from "@/lib/auth/auth-context"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [checkingAuth, setCheckingAuth] = useState(true)
   const router = useRouter()
-  const { user, session } = useAuth()
 
-  // Redirect if already authenticated
+  // Check if user is already authenticated WITHOUT using auth context
   useEffect(() => {
-    if (user && session) {
-      router.replace("/calendar")
+    const checkExistingSession = async () => {
+      try {
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession()
+
+        if (!error && session?.user) {
+          console.log("Existing session found, redirecting to calendar")
+          router.replace("/calendar")
+          return
+        }
+
+        console.log("No existing session, staying on login page")
+      } catch (error) {
+        console.error("Error checking session:", error)
+      } finally {
+        setCheckingAuth(false)
+      }
     }
-  }, [user, session, router])
+
+    checkExistingSession()
+  }, [router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,34 +52,43 @@ export default function LoginPage() {
     setError("")
 
     try {
+      console.log("Attempting login for:", email)
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
+        console.error("Login error:", error)
         setError(error.message)
         return
       }
 
       if (data.user && data.session) {
-        router.push("/calendar")
+        console.log("Login successful, redirecting to calendar")
+        // Small delay to ensure session is properly set
+        setTimeout(() => {
+          router.push("/calendar")
+        }, 100)
+      } else {
+        setError("Login failed - no session created")
       }
     } catch (error) {
-      console.error("Login error:", error)
+      console.error("Login exception:", error)
       setError("An unexpected error occurred")
     } finally {
       setLoading(false)
     }
   }
 
-  // Don't render if already authenticated
-  if (user && session) {
+  // Show loading while checking existing auth
+  if (checkingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Redirecting...</p>
+          <p className="text-muted-foreground">Checking authentication...</p>
         </div>
       </div>
     )
