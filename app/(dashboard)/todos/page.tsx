@@ -15,6 +15,7 @@ import { supabase } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { Plus, Calendar, Clock, Filter, Trash2, Edit } from "lucide-react"
 import { format } from "date-fns"
+import { useRouter } from "next/navigation"
 import type { Database } from "@/lib/supabase/types"
 
 type Todo = Database["public"]["Tables"]["todos"]["Row"]
@@ -29,6 +30,7 @@ const PRIORITY_COLORS = {
 export default function TodosPage() {
   const [todos, setTodos] = useState<Todo[]>([])
   const [loading, setLoading] = useState(true)
+  const [authChecked, setAuthChecked] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null)
   const [filter, setFilter] = useState<"all" | "pending" | "completed">("all")
@@ -36,6 +38,7 @@ export default function TodosPage() {
 
   const { user } = useAuth()
   const { toast } = useToast()
+  const router = useRouter()
 
   const [formData, setFormData] = useState({
     title: "",
@@ -44,18 +47,58 @@ export default function TodosPage() {
     due_date: "",
   })
 
+  // Client-side auth protection
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+
+        console.log("Todos page auth check:", {
+          hasAuthUser: !!user,
+          hasDirectSession: !!session,
+        })
+
+        if (!session?.user) {
+          console.log("No valid session found, redirecting to login")
+          router.replace("/login")
+          return
+        }
+
+        console.log("Valid session found, staying on todos page")
+        setAuthChecked(true)
+      } catch (error) {
+        console.error("Auth check error:", error)
+        router.replace("/login")
+      }
+    }
+
+    const timer = setTimeout(checkAuth, 100)
+    return () => clearTimeout(timer)
+  }, [router, user])
+
   // Fetch todos
   const fetchTodos = async () => {
-    if (!user) return
-
     try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!session?.user) {
+        console.log("No session for fetching todos")
+        return
+      }
+
+      console.log("Fetching todos for user:", session.user.id)
       const { data, error } = await supabase
         .from("todos")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", session.user.id)
         .order("created_at", { ascending: false })
 
       if (error) throw error
+      console.log("Todos fetched:", data?.length || 0)
       setTodos(data || [])
     } catch (error) {
       console.error("Error fetching todos:", error)
@@ -70,8 +113,10 @@ export default function TodosPage() {
   }
 
   useEffect(() => {
-    fetchTodos()
-  }, [user])
+    if (authChecked) {
+      fetchTodos()
+    }
+  }, [authChecked])
 
   // Filter todos
   const filteredTodos = todos.filter((todo) => {
@@ -105,15 +150,28 @@ export default function TodosPage() {
 
   // Handle todo save
   const handleSaveTodo = async () => {
-    if (!user || !formData.title.trim()) return
+    if (!formData.title.trim()) return
 
     try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!session?.user) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to save todos",
+          variant: "destructive",
+        })
+        return
+      }
+
       const todoData: TodoInsert = {
         title: formData.title.trim(),
         description: formData.description.trim() || null,
         priority: formData.priority,
         due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null,
-        user_id: user.id,
+        user_id: session.user.id,
       }
 
       if (selectedTodo) {
@@ -199,12 +257,13 @@ export default function TodosPage() {
     setDialogOpen(true)
   }
 
-  if (loading) {
+  // Show loading while checking auth or loading todos
+  if (!authChecked || loading) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading todos...</p>
+          <p className="text-muted-foreground">{!authChecked ? "Checking authentication..." : "Loading todos..."}</p>
         </div>
       </div>
     )

@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/auth/auth-context"
 import { supabase } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { Plus, Users, Copy, ExternalLink, Settings, Trash2 } from "lucide-react"
+import { useRouter } from "next/navigation"
 import type { Database } from "@/lib/supabase/types"
 
 type MeetingRequest = Database["public"]["Tables"]["meeting_requests"]["Row"]
@@ -22,11 +23,13 @@ type MeetingRequestInsert = Database["public"]["Tables"]["meeting_requests"]["In
 export default function MeetingsPage() {
   const [meetingRequests, setMeetingRequests] = useState<MeetingRequest[]>([])
   const [loading, setLoading] = useState(true)
+  const [authChecked, setAuthChecked] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingRequest | null>(null)
 
   const { user } = useAuth()
   const { toast } = useToast()
+  const router = useRouter()
 
   const [formData, setFormData] = useState({
     title: "",
@@ -38,18 +41,58 @@ export default function MeetingsPage() {
     is_active: true,
   })
 
+  // Client-side auth protection
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+
+        console.log("Meetings page auth check:", {
+          hasAuthUser: !!user,
+          hasDirectSession: !!session,
+        })
+
+        if (!session?.user) {
+          console.log("No valid session found, redirecting to login")
+          router.replace("/login")
+          return
+        }
+
+        console.log("Valid session found, staying on meetings page")
+        setAuthChecked(true)
+      } catch (error) {
+        console.error("Auth check error:", error)
+        router.replace("/login")
+      }
+    }
+
+    const timer = setTimeout(checkAuth, 100)
+    return () => clearTimeout(timer)
+  }, [router, user])
+
   // Fetch meeting requests
   const fetchMeetingRequests = async () => {
-    if (!user) return
-
     try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!session?.user) {
+        console.log("No session for fetching meeting requests")
+        return
+      }
+
+      console.log("Fetching meeting requests for user:", session.user.id)
       const { data, error } = await supabase
         .from("meeting_requests")
         .select("*")
-        .eq("organizer_id", user.id)
+        .eq("organizer_id", session.user.id)
         .order("created_at", { ascending: false })
 
       if (error) throw error
+      console.log("Meeting requests fetched:", data?.length || 0)
       setMeetingRequests(data || [])
     } catch (error) {
       console.error("Error fetching meeting requests:", error)
@@ -64,8 +107,10 @@ export default function MeetingsPage() {
   }
 
   useEffect(() => {
-    fetchMeetingRequests()
-  }, [user])
+    if (authChecked) {
+      fetchMeetingRequests()
+    }
+  }, [authChecked])
 
   // Generate unique slug
   const generateSlug = (title: string) => {
@@ -79,9 +124,22 @@ export default function MeetingsPage() {
 
   // Handle save meeting request
   const handleSaveMeetingRequest = async () => {
-    if (!user || !formData.title.trim()) return
+    if (!formData.title.trim()) return
 
     try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!session?.user) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to save meeting requests",
+          variant: "destructive",
+        })
+        return
+      }
+
       const meetingData: MeetingRequestInsert = {
         title: formData.title.trim(),
         description: formData.description.trim() || null,
@@ -90,7 +148,7 @@ export default function MeetingsPage() {
         location: formData.location.trim() || null,
         meeting_type: formData.meeting_type,
         is_active: formData.is_active,
-        organizer_id: user.id,
+        organizer_id: session.user.id,
         slug: selectedMeeting ? selectedMeeting.slug : generateSlug(formData.title),
       }
 
@@ -218,12 +276,13 @@ export default function MeetingsPage() {
     setDialogOpen(true)
   }
 
-  if (loading) {
+  // Show loading while checking auth or loading meetings
+  if (!authChecked || loading) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading meetings...</p>
+          <p className="text-muted-foreground">{!authChecked ? "Checking authentication..." : "Loading meetings..."}</p>
         </div>
       </div>
     )
