@@ -40,7 +40,7 @@ export function Sidebar() {
     await signOut()
   }
 
-  // Use profile data if available, otherwise fall back to user data
+  // Safely access user data with fallbacks
   const displayName = profile?.full_name || user?.user_metadata?.full_name || "User"
   const displayEmail = profile?.email || user?.email || ""
   const displayInitial = displayName.charAt(0) || displayEmail.charAt(0) || "U"
@@ -76,7 +76,7 @@ export function Sidebar() {
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-2">
             {navigation.map((item) => {
-              const isActive = pathname.startsWith(item.href)
+              const isActive = pathname?.startsWith(item.href)
               return (
                 <Link
                   key={item.name}

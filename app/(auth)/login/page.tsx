@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { Suspense, useState, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -13,77 +13,46 @@ import { supabase } from "@/lib/supabase/client"
 import { Calendar, Loader2 } from "lucide-react"
 import { useAuth } from "@/lib/auth/auth-context"
 
-function LoginForm() {
+export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const router = useRouter()
-  const { user, session, loading: authLoading } = useAuth()
+  const { user, session } = useAuth()
 
-  // Debug logging
+  // Redirect if already authenticated
   useEffect(() => {
-    console.log("Login page auth state:", {
-      authLoading,
-      hasUser: !!user,
-      hasSession: !!session,
-      userId: user?.id,
-    })
-  }, [authLoading, user, session])
-
-  // Redirect if already authenticated - but only after auth loading is complete
-  useEffect(() => {
-    if (!authLoading && user && session) {
-      console.log("User already authenticated, redirecting to calendar")
+    if (user && session) {
       router.replace("/calendar")
     }
-  }, [user, session, authLoading, router])
+  }, [user, session, router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (loading) return // Prevent double submission
-
     setLoading(true)
     setError("")
 
     try {
-      console.log("Attempting login for:", email)
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
-        console.error("Login error:", error)
         setError(error.message)
         return
       }
 
       if (data.user && data.session) {
-        console.log("Login successful for user:", data.user.id)
-        // The auth context will handle the redirect
-      } else {
-        console.error("Login succeeded but no user/session returned")
-        setError("Login failed - no session created")
+        router.push("/calendar")
       }
     } catch (error) {
-      console.error("Login exception:", error)
+      console.error("Login error:", error)
       setError("An unexpected error occurred")
     } finally {
       setLoading(false)
     }
-  }
-
-  // Show a simple loading state while auth is initializing
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    )
   }
 
   // Don't render if already authenticated
@@ -98,7 +67,6 @@ function LoginForm() {
     )
   }
 
-  // Render the login form
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
@@ -158,19 +126,5 @@ function LoginForm() {
         </CardContent>
       </Card>
     </div>
-  )
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-background">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      }
-    >
-      <LoginForm />
-    </Suspense>
   )
 }

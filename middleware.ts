@@ -8,52 +8,6 @@ export async function middleware(request: NextRequest) {
     },
   })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value,
-            ...options,
-          })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          response.cookies.set({
-            name,
-            value,
-            ...options,
-          })
-        },
-        remove(name: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value: "",
-            ...options,
-          })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          response.cookies.set({
-            name,
-            value: "",
-            ...options,
-          })
-        },
-      },
-    },
-  )
-
   const pathname = request.nextUrl.pathname
 
   // Skip middleware for static files, API routes, and favicon
@@ -67,66 +21,80 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    // Get the session with error handling
-    const {
-      data: { session },
-      error,
-    } = await supabase.auth.getSession()
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return request.cookies.get(name)?.value
+          },
+          set(name: string, value: string, options: CookieOptions) {
+            request.cookies.set({
+              name,
+              value,
+              ...options,
+            })
+            response = NextResponse.next({
+              request: {
+                headers: request.headers,
+              },
+            })
+            response.cookies.set({
+              name,
+              value,
+              ...options,
+            })
+          },
+          remove(name: string, options: CookieOptions) {
+            request.cookies.set({
+              name,
+              value: "",
+              ...options,
+            })
+            response = NextResponse.next({
+              request: {
+                headers: request.headers,
+              },
+            })
+            response.cookies.set({
+              name,
+              value: "",
+              ...options,
+            })
+          },
+        },
+      },
+    )
 
-    if (error) {
-      console.error("Middleware auth error:", error)
-      // On auth error, redirect to login for protected routes
-      const protectedRoutes = ["/calendar", "/todos", "/meetings", "/settings"]
-      const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
+    // Skip auth check for auth pages to prevent redirect loops
+    const authRoutes = ["/login", "/signup"]
+    const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))
 
-      if (isProtectedRoute) {
-        console.log("Auth error on protected route, redirecting to login")
-        return NextResponse.redirect(new URL("/login", request.url))
-      }
+    if (isAuthRoute) {
       return response
     }
 
-    console.log("Middleware check:", {
-      pathname,
-      hasSession: !!session,
-      userId: session?.user?.id,
-    })
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
 
     // Protected routes
     const protectedRoutes = ["/calendar", "/todos", "/meetings", "/settings"]
     const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
 
-    // Auth routes
-    const authRoutes = ["/login", "/signup"]
-    const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))
-
     if (isProtectedRoute && !session) {
-      console.log("Middleware: Redirecting to login - no session")
       return NextResponse.redirect(new URL("/login", request.url))
-    }
-
-    if (isAuthRoute && session) {
-      console.log("Middleware: Redirecting to calendar - already authenticated")
-      return NextResponse.redirect(new URL("/calendar", request.url))
     }
 
     return response
   } catch (error) {
     console.error("Middleware error:", error)
-    // On error, allow the request to continue but log it
+    // On error, allow the request to continue
     return response
   }
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public files (public folder)
-     */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 }

@@ -11,7 +11,7 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Calendar Pro - Your Personal Calendar & Task Manager",
   description: "A modern calendar app with todo lists and meeting booking features",
-    generator: 'v0.dev'
+  generator: "v0.dev",
 }
 
 export default function RootLayout({
