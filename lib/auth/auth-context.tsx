@@ -105,6 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Get initial session
     const initializeAuth = async () => {
       try {
+        console.log("Initializing auth...")
         const {
           data: { session },
           error,
@@ -112,7 +113,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (error) {
           console.error("Error getting session:", error)
-          if (mounted) setLoading(false)
+          if (mounted) {
+            setLoading(false)
+          }
           return
         }
 
@@ -123,15 +126,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(session?.user ?? null)
 
           if (session?.user) {
+            console.log("User found in session, fetching profile...")
             const profile = await fetchProfile(session.user.id)
-            if (mounted) setProfile(profile)
+            if (mounted) {
+              setProfile(profile)
+            }
           }
 
+          console.log("Auth initialization complete, setting loading to false")
           setLoading(false)
         }
       } catch (error) {
         console.error("Error initializing auth:", error)
-        if (mounted) setLoading(false)
+        if (mounted) {
+          setLoading(false)
+        }
       }
     }
 
@@ -145,17 +154,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log("Auth state change:", event, !!session, session?.user?.email)
 
+      // Update state immediately
       setSession(session)
       setUser(session?.user ?? null)
 
       if (session?.user) {
+        console.log("User signed in, fetching profile...")
         const profileData = await fetchProfile(session.user.id)
-        if (mounted) setProfile(profileData)
+        if (mounted) {
+          setProfile(profileData)
+        }
       } else {
-        if (mounted) setProfile(null)
+        console.log("User signed out, clearing profile")
+        if (mounted) {
+          setProfile(null)
+        }
       }
 
-      if (mounted) setLoading(false)
+      // Always set loading to false after auth state change
+      if (mounted) {
+        console.log("Auth state change complete, setting loading to false")
+        setLoading(false)
+      }
     })
 
     return () => {
@@ -163,6 +183,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe()
     }
   }, [])
+
+  // Debug logging
+  useEffect(() => {
+    console.log("Auth context state:", {
+      loading,
+      hasUser: !!user,
+      hasSession: !!session,
+      hasProfile: !!profile,
+      userId: user?.id,
+      userEmail: user?.email,
+    })
+  }, [loading, user, session, profile])
 
   return (
     <AuthContext.Provider

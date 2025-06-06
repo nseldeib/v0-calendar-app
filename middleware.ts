@@ -80,6 +80,7 @@ export async function middleware(request: NextRequest) {
       const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
 
       if (isProtectedRoute) {
+        console.log("Auth error on protected route, redirecting to login")
         return NextResponse.redirect(new URL("/login", request.url))
       }
       return response
@@ -100,12 +101,12 @@ export async function middleware(request: NextRequest) {
     const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))
 
     if (isProtectedRoute && !session) {
-      console.log("Redirecting to login - no session")
+      console.log("Middleware: Redirecting to login - no session")
       return NextResponse.redirect(new URL("/login", request.url))
     }
 
     if (isAuthRoute && session) {
-      console.log("Redirecting to calendar - already authenticated")
+      console.log("Middleware: Redirecting to calendar - already authenticated")
       return NextResponse.redirect(new URL("/calendar", request.url))
     }
 

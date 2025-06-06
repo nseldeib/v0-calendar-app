@@ -20,15 +20,25 @@ function LoginForm() {
   const [error, setError] = useState("")
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, loading: authLoading } = useAuth()
+  const { user, session, loading: authLoading } = useAuth()
+
+  // Debug logging
+  useEffect(() => {
+    console.log("Login page auth state:", {
+      authLoading,
+      hasUser: !!user,
+      hasSession: !!session,
+      userId: user?.id,
+    })
+  }, [authLoading, user, session])
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (!authLoading && user) {
+    if (!authLoading && user && session) {
       console.log("User already authenticated, redirecting to calendar")
       router.replace("/calendar")
     }
-  }, [user, authLoading, router])
+  }, [user, session, authLoading, router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -46,10 +56,22 @@ function LoginForm() {
         console.error("Login error:", error)
         setError(error.message)
         setLoading(false)
-      } else if (data.user && data.session) {
+        return
+      }
+
+      if (data.user && data.session) {
         console.log("Login successful for user:", data.user.id)
-        // Don't set loading to false here - let the auth context handle the redirect
-        router.replace("/calendar")
+        console.log("Session created:", !!data.session)
+
+        // Wait a moment for auth context to update
+        setTimeout(() => {
+          console.log("Redirecting to calendar after login")
+          router.replace("/calendar")
+        }, 100)
+      } else {
+        console.error("Login succeeded but no user/session returned")
+        setError("Login failed - no session created")
+        setLoading(false)
       }
     } catch (error) {
       console.error("Login exception:", error)
@@ -58,8 +80,20 @@ function LoginForm() {
     }
   }
 
+  // Show loading while auth is loading
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
   // Don't render if already authenticated
-  if (!authLoading && user) {
+  if (user && session) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">

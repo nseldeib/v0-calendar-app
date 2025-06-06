@@ -26,21 +26,26 @@ export default function CalendarPage() {
   const { toast } = useToast()
   const router = useRouter()
 
-  // Check authentication with better error handling
+  // Debug logging
   useEffect(() => {
-    console.log("Calendar page - Auth state:", {
+    console.log("Calendar page auth state:", {
       authLoading,
       hasUser: !!user,
       hasSession: !!session,
       userId: user?.id,
     })
+  }, [authLoading, user, session])
 
+  // Check authentication with better error handling
+  useEffect(() => {
     // Only redirect if auth is done loading and there's no user
     if (!authLoading) {
       if (!user || !session) {
         console.log("No authenticated user, redirecting to login")
         router.replace("/login")
         return
+      } else {
+        console.log("User authenticated, staying on calendar page")
       }
     }
   }, [user, session, authLoading, router])
@@ -82,12 +87,14 @@ export default function CalendarPage() {
 
   useEffect(() => {
     // Only fetch events if we have a user and auth is not loading
-    if (!authLoading && user) {
+    if (!authLoading && user && session) {
+      console.log("Fetching events...")
       fetchEvents()
-    } else if (!authLoading && !user) {
+    } else if (!authLoading && (!user || !session)) {
+      console.log("No user/session, setting loading to false")
       setLoading(false)
     }
-  }, [user, authLoading])
+  }, [user, session, authLoading])
 
   // Navigation handlers
   const handlePreviousMonth = () => {
