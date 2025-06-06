@@ -56,16 +56,34 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
 
-  // Skip middleware for static files and API routes
-  if (pathname.startsWith("/_next") || pathname.startsWith("/api") || pathname.includes(".")) {
+  // Skip middleware for static files, API routes, and favicon
+  if (
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/api") ||
+    pathname.includes(".") ||
+    pathname === "/favicon.ico"
+  ) {
     return response
   }
 
   try {
-    // Get the session
+    // Get the session with error handling
     const {
       data: { session },
+      error,
     } = await supabase.auth.getSession()
+
+    if (error) {
+      console.error("Middleware auth error:", error)
+      // On auth error, redirect to login for protected routes
+      const protectedRoutes = ["/calendar", "/todos", "/meetings", "/settings"]
+      const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
+
+      if (isProtectedRoute) {
+        return NextResponse.redirect(new URL("/login", request.url))
+      }
+      return response
+    }
 
     console.log("Middleware check:", {
       pathname,
@@ -94,7 +112,7 @@ export async function middleware(request: NextRequest) {
     return response
   } catch (error) {
     console.error("Middleware error:", error)
-    // On error, allow the request to continue
+    // On error, allow the request to continue but log it
     return response
   }
 }

@@ -103,21 +103,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let mounted = true
 
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!mounted) return
+    const initializeAuth = async () => {
+      try {
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession()
 
-      console.log("Initial session check:", !!session, session?.user?.email)
-      setSession(session)
-      setUser(session?.user ?? null)
+        if (error) {
+          console.error("Error getting session:", error)
+          if (mounted) setLoading(false)
+          return
+        }
 
-      if (session?.user) {
-        fetchProfile(session.user.id).then((profile) => {
-          if (mounted) setProfile(profile)
-        })
+        console.log("Initial session check:", !!session, session?.user?.email)
+
+        if (mounted) {
+          setSession(session)
+          setUser(session?.user ?? null)
+
+          if (session?.user) {
+            const profile = await fetchProfile(session.user.id)
+            if (mounted) setProfile(profile)
+          }
+
+          setLoading(false)
+        }
+      } catch (error) {
+        console.error("Error initializing auth:", error)
+        if (mounted) setLoading(false)
       }
+    }
 
-      setLoading(false)
-    })
+    initializeAuth()
 
     // Listen for auth changes
     const {
@@ -126,12 +144,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!mounted) return
 
       console.log("Auth state change:", event, !!session, session?.user?.email)
-
-      // Handle immediate sign in after signup or login
-      if (event === "SIGNED_IN" && session?.user) {
-        console.log("User signed in, redirecting to calendar")
-        window.location.href = "/calendar"
-      }
 
       setSession(session)
       setUser(session?.user ?? null)

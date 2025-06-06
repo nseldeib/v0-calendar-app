@@ -26,7 +26,7 @@ function LoginForm() {
   useEffect(() => {
     if (!authLoading && user) {
       console.log("User already authenticated, redirecting to calendar")
-      router.push("/calendar")
+      router.replace("/calendar")
     }
   }, [user, authLoading, router])
 
@@ -45,21 +45,29 @@ function LoginForm() {
       if (error) {
         console.error("Login error:", error)
         setError(error.message)
+        setLoading(false)
       } else if (data.user && data.session) {
         console.log("Login successful for user:", data.user.id)
-        router.push("/calendar")
+        // Don't set loading to false here - let the auth context handle the redirect
+        router.replace("/calendar")
       }
     } catch (error) {
       console.error("Login exception:", error)
       setError("An unexpected error occurred")
-    } finally {
       setLoading(false)
     }
   }
 
   // Don't render if already authenticated
   if (!authLoading && user) {
-    return null
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Redirecting...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -89,6 +97,7 @@ function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={loading}
               />
             </div>
 
@@ -101,12 +110,13 @@ function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={loading}
               />
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Sign In
+              {loading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
 

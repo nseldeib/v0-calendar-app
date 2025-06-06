@@ -26,7 +26,7 @@ export default function CalendarPage() {
   const { toast } = useToast()
   const router = useRouter()
 
-  // Check authentication
+  // Check authentication with better error handling
   useEffect(() => {
     console.log("Calendar page - Auth state:", {
       authLoading,
@@ -35,10 +35,13 @@ export default function CalendarPage() {
       userId: user?.id,
     })
 
-    if (!authLoading && !user) {
-      console.log("No user found, redirecting to login")
-      router.push("/login")
-      return
+    // Only redirect if auth is done loading and there's no user
+    if (!authLoading) {
+      if (!user || !session) {
+        console.log("No authenticated user, redirecting to login")
+        router.replace("/login")
+        return
+      }
     }
   }, [user, session, authLoading, router])
 
@@ -46,6 +49,7 @@ export default function CalendarPage() {
   const fetchEvents = async () => {
     if (!user) {
       console.log("No user, skipping event fetch")
+      setLoading(false)
       return
     }
 
@@ -77,8 +81,11 @@ export default function CalendarPage() {
   }
 
   useEffect(() => {
-    if (user && !authLoading) {
+    // Only fetch events if we have a user and auth is not loading
+    if (!authLoading && user) {
       fetchEvents()
+    } else if (!authLoading && !user) {
+      setLoading(false)
     }
   }, [user, authLoading])
 
@@ -183,6 +190,18 @@ export default function CalendarPage() {
     )
   }
 
+  // Don't render if no user (will redirect)
+  if (!user || !session) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Redirecting...</p>
+        </div>
+      </div>
+    )
+  }
+
   // Show loading while events are loading
   if (loading) {
     return (
@@ -193,11 +212,6 @@ export default function CalendarPage() {
         </div>
       </div>
     )
-  }
-
-  // Don't render if no user (will redirect)
-  if (!user) {
-    return null
   }
 
   return (
