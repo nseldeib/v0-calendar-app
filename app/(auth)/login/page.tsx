@@ -20,7 +20,7 @@ export default function LoginPage() {
   const [checkingAuth, setCheckingAuth] = useState(true)
   const router = useRouter()
 
-  // Check if user is already authenticated WITHOUT using auth context
+  // Check if user is already authenticated
   useEffect(() => {
     const checkExistingSession = async () => {
       try {
@@ -29,8 +29,11 @@ export default function LoginPage() {
           error,
         } = await supabase.auth.getSession()
 
+        console.log("Login page checking existing session:", !!session, error?.message)
+
         if (!error && session?.user) {
           console.log("Existing session found, redirecting to calendar")
+          // Use replace to avoid back button issues
           router.replace("/calendar")
           return
         }
@@ -39,7 +42,8 @@ export default function LoginPage() {
       } catch (error) {
         console.error("Error checking session:", error)
       } finally {
-        setCheckingAuth(false)
+        // Add a small delay to prevent flickering
+        setTimeout(() => setCheckingAuth(false), 200)
       }
     }
 
@@ -67,10 +71,10 @@ export default function LoginPage() {
 
       if (data.user && data.session) {
         console.log("Login successful, redirecting to calendar")
-        // Small delay to ensure session is properly set
+        // Add a longer delay to ensure session is fully established
         setTimeout(() => {
-          router.push("/calendar")
-        }, 100)
+          router.replace("/calendar")
+        }, 500)
       } else {
         setError("Login failed - no session created")
       }
@@ -88,7 +92,7 @@ export default function LoginPage() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Checking authentication...</p>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     )

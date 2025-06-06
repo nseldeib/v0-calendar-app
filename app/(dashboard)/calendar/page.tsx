@@ -21,49 +21,63 @@ export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [eventDialogOpen, setEventDialogOpen] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [authChecked, setAuthChecked] = useState(false)
 
-  const { user, session, loading: authLoading } = useAuth()
+  const { user, session } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
 
-  // Debug logging
+  // Client-side auth protection
   useEffect(() => {
-    console.log("Calendar page auth state:", {
-      authLoading,
-      hasUser: !!user,
-      hasSession: !!session,
-      userId: user?.id,
-    })
-  }, [authLoading, user, session])
+    const checkAuth = async () => {
+      try {
+        // Double-check session directly with Supabase
+        const {
+          data: { session: currentSession },
+        } = await supabase.auth.getSession()
 
-  // Check authentication with better error handling
-  useEffect(() => {
-    // Only redirect if auth is done loading and there's no user
-    if (!authLoading) {
-      if (!user || !session) {
-        console.log("No authenticated user, redirecting to login")
+        console.log("Calendar page auth check:", {
+          hasAuthUser: !!user,
+          hasAuthSession: !!session,
+          hasDirectSession: !!currentSession,
+        })
+
+        if (!currentSession?.user) {
+          console.log("No valid session found, redirecting to login")
+          router.replace("/login")
+          return
+        }
+
+        console.log("Valid session found, staying on calendar")
+        setAuthChecked(true)
+      } catch (error) {
+        console.error("Auth check error:", error)
         router.replace("/login")
-        return
-      } else {
-        console.log("User authenticated, staying on calendar page")
       }
     }
-  }, [user, session, authLoading, router])
 
-  // Fetch events
+    // Add a small delay to avoid race conditions
+    const timer = setTimeout(checkAuth, 100)
+    return () => clearTimeout(timer)
+  }, [router, user, session])
+
+  // Fetch events only after auth is confirmed
   const fetchEvents = async () => {
-    if (!user) {
-      console.log("No user, skipping event fetch")
-      setLoading(false)
-      return
-    }
-
     try {
-      console.log("Fetching events for user:", user.id)
+      const {
+        data: { session: currentSession },
+      } = await supabase.auth.getSession()
+
+      if (!currentSession?.user) {
+        console.log("No session for fetching events")
+        return
+      }
+
+      console.log("Fetching events for user:", currentSession.user.id)
       const { data, error } = await supabase
         .from("events")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", currentSession.user.id)
         .order("start_time", { ascending: true })
 
       if (error) {
@@ -86,15 +100,10 @@ export default function CalendarPage() {
   }
 
   useEffect(() => {
-    // Only fetch events if we have a user and auth is not loading
-    if (!authLoading && user && session) {
-      console.log("Fetching events...")
+    if (authChecked) {
       fetchEvents()
-    } else if (!authLoading && (!user || !session)) {
-      console.log("No user/session, setting loading to false")
-      setLoading(false)
     }
-  }, [user, session, authLoading])
+  }, [authChecked])
 
   // Navigation handlers
   const handlePreviousMonth = () => {
@@ -125,10 +134,21 @@ export default function CalendarPage() {
   }
 
   const handleSaveEvent = async (eventData: EventInsert) => {
-    if (!user) return
-
     try {
-      const dataWithUser = { ...eventData, user_id: user.id }
+      const {
+        data: { session: currentSession },
+      } = await supabase.auth.getSession()
+
+      if (!currentSession?.user) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to save events",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const dataWithUser = { ...eventData, user_id: currentSession.user.id }
 
       if (selectedEvent) {
         // Update existing event
@@ -185,37 +205,13 @@ export default function CalendarPage() {
     }
   }
 
-  // Show loading while auth is loading
-  if (authLoading) {
+  // Show loading while checking auth or loading events
+  if (!authChecked || loading) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Don't render if no user (will redirect)
-  if (!user || !session) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Redirecting...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Show loading while events are loading
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading calendar...</p>
+          <p className="text-muted-foreground">{!authChecked ? "Checking authentication..." : "Loading calendar..."}</p>
         </div>
       </div>
     )
